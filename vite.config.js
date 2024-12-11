@@ -7,7 +7,8 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/js/user_number.js'
+                'resources/js/user_number.js',
+                'resources/js/take_number_list.js'
             ],
             refresh: true,
         }),
