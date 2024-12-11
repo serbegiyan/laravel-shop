@@ -12,4 +12,7 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    server: {
+        host: 'https://begyian-laravel.site',
+    },
 });
