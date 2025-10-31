@@ -1,47 +1,69 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Noutbook\NoutbookCommentRequest;
 use App\Http\Requests\Noutbook\StoreRequest;
-use App\Models\Basket;
-use App\Models\Comment;
 use App\Models\Noutbook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\Contracts\NoutbookServiceInterface;
+use App\Services\Contracts\CommentServiceInterface;
+use App\Services\Contracts\BasketServiceInterface;
 
-class NoutbookController extends BaseController
+class NoutbookController extends Controller
 {
+    public function __construct(
+        private NoutbookServiceInterface $noutbookService,
+        private CommentServiceInterface $commentService,
+        private BasketServiceInterface $basketService
+    ) {}
+
     public function index(Request $request)
     {
-        $noutbooks = Noutbook::filter($request->all())->paginate(10)->withQueryString();
-        $product = Noutbook::find(1);
-        $brends = Noutbook::all()->pluck('brend')->unique();
-        $rams = Noutbook::all()->pluck('ram')->unique();
-        $memories = Noutbook::all()->pluck('memory')->unique();
+        $noutbooks = $this->noutbookService->getFilteredList($request->all());
+        $product = $this->noutbookService->getDefaultPreview();
+        $filters = $this->noutbookService->getFilterOptions();
         $total = $noutbooks->total();
 
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
 
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
-
-        return view('noutbooks.index', compact('noutbooks', 'product', 'brends', 'rams', 'memories', 'total', 'purchase', 'all_purchases'));
+        return view('noutbooks.index', [
+            'noutbooks' => $noutbooks,
+            'product' => $product,
+            'brends' => $filters['brends'],
+            'rams' => $filters['rams'],
+            'memories' => $filters['memories'],
+            'total' => $total,
+            'purchase' => $purchase,
+            'all_purchases' => $all_purchases
+        ]);
     }
 
+    public function show(Noutbook $noutbook, Request $request)
+    {
+        $product = $noutbook;
+        $variants = $this->noutbookService->getVariants($product);
+        $options = $this->noutbookService->getProductOptions($product);
+        $total = $this->commentService->getTotalComments($product);
+        $rating = $this->commentService->getAverageRating($product);
+
+        $user_number = $request->session()->get('user_number');
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
+        return view('card', compact('product', 'variants', 'options', 'purchase', 'total', 'rating', 'all_purchases'));
+    }
 
     public function indexComments(Noutbook $noutbook, Request $request)
     {
         $product = $noutbook;
-
-        $comments = Comment::filter($request->all())->
-        where('commentable_type', '=', 'noutbooks')->
-        where('commentable_id', '=', $product->id)->
-        orderBy('created_at', 'desc')->paginate(10);
+        $comments = $this->commentService->getPaginatedForProduct($product, $request->all());
 
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
 
         return view('comments', compact('product', 'comments', 'all_purchases'));
     }
@@ -50,9 +72,10 @@ class NoutbookController extends BaseController
     {
         $noutbooks = Noutbook::all();
 
-        $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $user_number = $request->query('user_number');
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
         return view('noutbooks.create', compact('noutbooks', 'all_purchases'));
     }
 
@@ -63,47 +86,15 @@ class NoutbookController extends BaseController
 
         return redirect()->route('noutbooks.index');
     }
-    public function show(Noutbook $noutbook, Request $request){
 
-        $product = $noutbook;
-        $options = [
-            'Производитель' => $noutbook->brend,
-            'Процессор' => $noutbook->processor,
-            'Максимальная частота, МГц' => $noutbook->speed,
-            'Видеокарта' => $noutbook->videocard,
-            'Операционная система' => $noutbook->os,
-            'Диагональ экрана, ″' => $noutbook->screen,
-            'Тип экрана' => $noutbook->screentype,
-            'Разрешение экрана, px' => $noutbook->resolution,
-            'Объем оперативной памяти, ГБ' => $noutbook->ram,
-            'Тип оперативной памяти' => $noutbook->ramtype,
-            'Емкость накопителя, ГБ' => $noutbook->memory,
-            'Тип накопителя' => $noutbook->memotype,
-            'Емкость аккумулятора, Вт·ч' => $noutbook->battery
-        ];
-        $variants = Noutbook::all()
-            ->where('name', '=', $noutbook->name)
-            ->where('color', '!=', $noutbook->color);
-
-        $comments = Comment::where('commentable_type', '=', 'noutbooks')->
-        where('commentable_id', '=', $product->id)->get();
-        $total = $comments->count();
-        $rating = $comments->avg('rating');
-
-        $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
-
-        return view('card', compact('product', 'variants', 'options', 'purchase', 'total', 'rating', 'all_purchases'));
-    }
     public function createcomment(Noutbook $noutbook, Request $request)
     {
         $product = $noutbook;
         $id = Auth::id();
 
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
 
         return view('createcomment', compact('product', 'id', 'all_purchases'));
     }
@@ -111,9 +102,8 @@ class NoutbookController extends BaseController
     public function storecomment(NoutbookCommentRequest $request)
     {
         $data = $request->validated();
-        Comment::create($data);
-        $last = Comment::all()->last();
+        $comment = $this->commentService->create($data);
 
-        return redirect()->route('noutbooksComments.index', $last->commentable_id);
+        return redirect()->route('noutbooksComments.index', $comment->commentable_id);
     }
 }

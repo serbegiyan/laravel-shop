@@ -26,46 +26,6 @@ document.addEventListener('touchmove', (event) => {
 })
 
 
-/*if (screenWidth < 768){
-    parent.addEventListener('touchstart', function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        initialPoint = event.changedTouches[0];
-        }, false);
-        parent.firstElementChild.addEventListener('touchend', function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        finalPoint = event.changedTouches[0];
-        let xAbs = Math.abs(initialPoint.pageX - finalPoint.pageX);
-            if (xAbs > 20) {
-                if (finalPoint.pageX < initialPoint.pageX){
-                    console.log('left');
-                    for (let i = 0; i < arraySrc.length; i++){
-                        if(arraySrc[i] ===  parent.firstElementChild.getAttribute('src')){
-                            if (i >= arraySrc.length - 1){
-                                i = -1;
-                            }
-                            parent.firstElementChild.setAttribute('src', arraySrc[i + 1]);
-                            break;
-                        }
-                    }
-                }
-                else{
-                    console.log('right');
-
-                    for (let i = arraySrc.length; i >= 0; i--){
-                        if(arraySrc[i] ===  parent.firstElementChild.getAttribute('src')){
-                            if (i == 0){
-                                i = arraySrc.length;
-                            }
-                            parent.setAttribute('src', arraySrc[i - 1]);
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-    }*/
 
 for (let elem of allSrc){
     if(elem.getAttribute('src') != '  '){

@@ -1,20 +1,25 @@
 <?php
-
 namespace App\Http\Controllers;
 
-use App\Http\Requests\BasketRequest;
-use App\Models\Basket;
 use Illuminate\Http\Request;
+use App\Http\Requests\BasketRequest;
+use App\Services\Contracts\BasketServiceInterface;
 
 class BasketController extends Controller
 {
+    public function __construct(
+        private BasketServiceInterface $basketService
+    ) {}
+
     public function index(Request $request)
     {
-        $number = $request->user_number;
-        $products = Basket::where('user_number', '=', $number)->get();
-        $total = $products->count();
-        $all_purchases = $total != 0 ? $total : '';
-        $count = $products->sum('total_price');
+        $userNumber = $request->user_number;
+
+        $products = $this->basketService->getByUserNumber($userNumber);
+        $total = $this->basketService->getTotalCount($products);
+        $count = $this->basketService->getTotalPrice($products);
+        $all_purchases = $total ?: '';
+
         return view('basket', compact('products', 'count', 'total', 'all_purchases'));
     }
 
@@ -22,37 +27,30 @@ class BasketController extends Controller
     {
         $data = $request->validated();
         $request->session()->put('user_number', $request->user_number);
-        $type = $request->product_type;
 
-        Basket::firstOrCreate($data);
+        $this->basketService->addToBasket($data);
 
-        return redirect()->route($type.'.index');
+        return redirect()->route($request->product_type . '.index');
     }
 
     public function delete(Request $request)
     {
-        $number = $request->user_number;
-        $name = $request->name;
-        $product = Basket::where('user_number', '=', $number)->
-            where('product_name', '=', $name)->first();
-        $product->delete();
+        $this->basketService->removeFromBasket(
+            $request->user_number,
+            $request->name
+        );
 
-       return back();
+        return back();
     }
 
     public function edit(Request $request)
     {
-        $number = $request->user_number;
-        $quantity = $request->quantity;
-        $name = $request->name;
-        $total_price = $request->total_price;
-
-        $product = Basket::where('user_number', '=', $number)->
-        where('product_name', '=', $name)->first();
-        $product->update([
-            'quantity' => $quantity,
-            'total_price' => $total_price
-        ]);
+        $this->basketService->updateProduct(
+            $request->user_number,
+            $request->name,
+            $request->quantity,
+            $request->total_price
+        );
 
         return back();
     }

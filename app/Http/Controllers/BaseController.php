@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Noutbook\Service;
+
+use Illuminate\Support\Facades\Request;
 
 class BaseController extends Controller
 {
-    public $service;
-
-    public function __construct(Service $service)
+    protected function getUserNumber(Request $request): string
     {
-        $this->service  = $service;
+        $user_number = $request->query('user_number');
+        if (!is_string($user_number)) {
+            abort(400, 'user_number is required');
+        }
+        return $user_number;
     }
 }
