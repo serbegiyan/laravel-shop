@@ -67,7 +67,8 @@ class SmartphoneController extends Controller
         $variants = $this->smartphoneService->getVariants($product);
 
         $details = $this->smartphoneService->getProductDetails($product);
-
+        $total = $this->commentService->getTotalComments($product);
+        $rating = $this->commentService->getAverageRating($product);
         $user_number = $request->session()->get('user_number');
         $purchase = $this->basketService->getByUserNumber($user_number);
         $all_purchases = $purchase->count() ?: '';
@@ -77,8 +78,8 @@ class SmartphoneController extends Controller
             'variants' => $variants,
             'purchase' => $purchase,
             'options' => $details['options'],
-            'total' => $details['total'],
-            'rating' => $details['rating'],
+            'total' => $total,
+            'rating' => $rating,
             'all_purchases' => $all_purchases
         ]);
     }

@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Models\Comment;
 use App\Models\Smartphone;
+use App\Services\Contracts\CommentServiceInterface;
 use App\Services\Contracts\SmartphoneServiceInterface;
 
 class SmartphoneService implements SmartphoneServiceInterface
@@ -14,13 +15,6 @@ class SmartphoneService implements SmartphoneServiceInterface
 
     public function getProductDetails(Smartphone $smartphone): array
     {
-        $product = $smartphone;
-
-        $comments = Comment::where('commentable_type', '=', 'smartphones')->
-        where('commentable_id', '=', $product->id)->get();
-        $rating = $comments->avg('rating');
-        $total = $comments->count();
-
         $options = [
             'Производитель' => $smartphone->brend,
             'Процессор' => $smartphone->processor,
@@ -34,7 +28,7 @@ class SmartphoneService implements SmartphoneServiceInterface
             'Материал корпуса' => $smartphone->corpus
         ];
 
-        return compact('comments', 'rating', 'total', 'options');
+        return compact('options');
     }
 
     public function getVariants(Smartphone $smartphone)
