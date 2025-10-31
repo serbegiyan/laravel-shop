@@ -80,7 +80,5 @@
         </form>
     </div>
 @endsection
-@push('scripts')
-    @vite(['resources/js/alert_send_order.js'])
-@endpush
+
 
