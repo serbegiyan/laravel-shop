@@ -3,5 +3,4 @@ window.onload = function() {
 
     let number = localStorage.getItem('user_number');
     user_number.setAttribute('value', number);
-    console.log(number)
 }

@@ -1,49 +1,55 @@
 <?php
-
 namespace App\Http\Controllers;
 
-use App\Http\Requests\OrderRequest;
-use App\Models\Basket;
-use App\Models\Order;
 use Illuminate\Http\Request;
+use App\Http\Requests\OrderRequest;
+use App\Models\Order;
+use App\Services\Contracts\OrderServiceInterface;
+use App\Services\Contracts\BasketServiceInterface;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private OrderServiceInterface $orderService,
+        private BasketServiceInterface $basketService
+    ) {}
+
     public function create(Request $request)
     {
         $number = $request->user_number;
+        $products = $this->basketService->getByUserNumber($number);
 
-        $products = Basket::where('user_number', '=', $number)->get();
-        $purchases = [];
-        foreach ($products as $product) {
-            global $purchases;
-            $purchases[] = $product->product_type.' модель: '.$product->product_name.'; цвет: '.$product->color.'; цена: '.$product->price.'; кол-во: '.$product->quantity.'<br>';
-        }
-        $details_purchases = implode('', $purchases);
-        $all_purchases = $products->count();
-        $order_price = $products->sum('total_price');
+        $details = $this->orderService->prepareOrderDetails($products);
 
-        return view('order', compact('products', 'all_purchases', 'number', 'order_price', 'details_purchases'));
+        return view('order', [
+            'products' => $products,
+            'all_purchases' => $details['all_purchases'],
+            'number' => $number,
+            'order_price' => $details['order_price'],
+            'details_purchases' => $details['details_purchases']
+        ]);
     }
 
-    public function store(OrderRequest $request, Order $order)
+    public function store(OrderRequest $request)
     {
         $data = $request->validated();
         $number = $data['number'];
         $email = $data['user_email'];
         unset($data['number']);
 
-        $products = Basket::where('user_number', '=', $number)->get();
+        $products = $this->basketService->getByUserNumber($number);
+
         foreach ($products as $product) {
             $product->delete();
         }
-        Order::firstOrCreate($data);
-        $order = Order::where('user_email', '=', $email)->latest()->first();
 
-        $purchase = Basket::where('user_number', '=', $number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $this->orderService->createOrder($data);
+        $order = $this->orderService->getLatestOrderByEmail($email);
 
+        $purchase = $this->basketService->getByUserNumber($number);
+        $all_purchases = $purchase->count() ?: '';
 
         return view('send_order', compact('order', 'all_purchases'));
     }
 }
+

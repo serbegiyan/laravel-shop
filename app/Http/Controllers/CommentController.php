@@ -1,30 +1,38 @@
 <?php
-
 namespace App\Http\Controllers;
 
-use App\Models\Basket;
+use Illuminate\Http\Request;
 use App\Models\Comment;
 use App\Models\User;
-use Illuminate\Http\Request;
+use App\Services\Contracts\CommentServiceInterface;
+use App\Services\Contracts\BasketServiceInterface;
 
 class CommentController extends Controller
 {
-    public function index(Request $request, Comment $comment)
+    public function __construct(
+        private CommentServiceInterface $commentService,
+        private BasketServiceInterface $basketService
+    ) {}
+
+    public function index(Request $request)
     {
-        $comments = Comment::all();
+        $comments = $this->commentService->getAll();
+
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
         return view('comments.index', compact('comments', 'all_purchases'));
     }
 
     public function show(Request $request, Comment $comment, User $user)
     {
-        $comments = Comment::where('user_id', $user->id)->get();
+        $comments = $this->commentService->getByUserId($user->id);
+
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
         return view('userscomment', compact('comments', 'user', 'all_purchases'));
     }
-
 }

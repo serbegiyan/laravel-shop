@@ -6,6 +6,9 @@ use App\Http\Requests\SmartphoneCommentRequest;
 use App\Models\Basket;
 use App\Models\Comment;
 use App\Models\Smartphone;
+use App\Services\Contracts\BasketServiceInterface;
+use App\Services\Contracts\CommentServiceInterface;
+use App\Services\Contracts\SmartphoneServiceInterface;
 use Illuminate\Http\Request;
 use EloquentFilter\ModelFilter;
 use Illuminate\Support\Facades\Auth;
@@ -13,34 +16,47 @@ use Illuminate\Support\Facades\Auth;
 
 class SmartphoneController extends Controller
 {
+    public function __construct(
+        private SmartphoneServiceInterface $smartphoneService,
+        private BasketServiceInterface $basketService,
+        private CommentServiceInterface $commentService
+    ) {}
     public function index(Request $request)
     {
-        $smartphones = Smartphone::filter($request->all())->paginate(10)->withQueryString();
-        $total = $smartphones->total();
-        $product = Smartphone::find(1);
-        $brends = Smartphone::all()->pluck('brend')->unique();
-        $rams = Smartphone::all()->pluck('ram')->unique();
-        $memories = Smartphone::all()->pluck('memory')->unique();
-
+        $smartphones = $this->smartphoneService->getFilteredList($request->all());
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
 
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $total = $smartphones->total();
 
-        return view('smartphones', compact('smartphones', 'product', 'brends', 'purchase', 'rams', 'memories', 'total', 'all_purchases'));
+        $filters = $this->smartphoneService->getFilterOptions();
+
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
+        $product = $smartphones->first();
+
+        return view('smartphones', [
+            'smartphones' => $smartphones,
+            'product' => $product,
+            'brends' => $filters['brends'],
+            'rams' => $filters['rams'],
+            'memories' => $filters['memories'],
+            'purchase' => $purchase,
+            'total' => $total,
+            'all_purchases' => $all_purchases
+        ]);
     }
 
     public function indexComments(Smartphone $smartphone, Request $request)
     {
         $product = $smartphone;
-        $comments = Comment::filter($request->all())->
-        where('commentable_type', '=', 'smartphones')->
-        where('commentable_id', '=', $product->id)->
-        orderBy('created_at', 'desc')->paginate(10);
+
+        $comments = $this->commentService->getPaginatedForProduct($product, $request->all());
 
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
         return view('comments', compact('product', 'comments', 'all_purchases'));
     }
 
@@ -48,50 +64,46 @@ class SmartphoneController extends Controller
     {
         $product = $smartphone;
 
-        $variants = Smartphone::all()
-            ->where('name', '=', $smartphone->name)
-            ->where('color', '!=', $smartphone->color);
+        $variants = $this->smartphoneService->getVariants($product);
 
-        $options = [
-            'Производитель' => $smartphone->brend,
-            'Процессор' => $smartphone->processor,
-            'Тактовая частота, МГц' => $smartphone->speed,
-            'Диагональ экрана, ″' => $smartphone->screen,
-            'Технология экрана' => $smartphone->tehnology,
-            'Разрешение экрана, px' => $smartphone->resolution,
-            'Объем оперативной памяти, ГБ' => $smartphone->ram,
-            'Встроенная память, ГБ' => $smartphone->memory,
-            'Количество точек матрицы, Мп' => $smartphone->camera,
-            'Материал корпуса' => $smartphone->corpus
-        ];
-
-        $comments = Comment::where('commentable_type', '=', 'smartphones')->
-        where('commentable_id', '=', $product->id)->get();
-        $total = $comments->count();
-        $rating = $comments->avg('rating');
-
+        $details = $this->smartphoneService->getProductDetails($product);
+        $total = $this->commentService->getTotalComments($product);
+        $rating = $this->commentService->getAverageRating($product);
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
-        return view('card', compact('product', 'variants', 'purchase', 'options', 'total', 'rating', 'all_purchases'));
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
+        return view('card', [
+            'product' => $product,
+            'variants' => $variants,
+            'purchase' => $purchase,
+            'options' => $details['options'],
+            'total' => $total,
+            'rating' => $rating,
+            'all_purchases' => $all_purchases
+        ]);
     }
 
     public function createcomment(Smartphone $smartphone, Request $request)
     {
         $product = $smartphone;
         $id = Auth::id();
+
         $user_number = $request->session()->get('user_number');
-        $purchase = Basket::where('user_number', '=', $user_number)->get();
-        $all_purchases = $purchase->count() != 0 ? $purchase->count() : '';
+        $purchase = $this->basketService->getByUserNumber($user_number);
+        $all_purchases = $purchase->count() ?: '';
+
         return view('createcomment', compact('product', 'id', 'all_purchases'));
     }
+
 
     public function storecomment(SmartphoneCommentRequest $request)
     {
         $data = $request->validated();
-        Comment::create($data);
-        $last = Comment::all()->last();
 
-        return redirect()->route('smartphonesComments.index', $last->commentable_id);
+        $comment = $this->commentService->create($data);
+
+        return redirect()->route('smartphonesComments.index', $comment->commentable_id);
     }
+
 }
